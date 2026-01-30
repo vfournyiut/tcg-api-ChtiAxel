@@ -19,19 +19,19 @@ async function main() {
         data: [
             {
                 username: "red",
-                email: "red@example.com",
+                email: "red@tcg.com",
                 password: hashedPassword,
             },
             {
                 username: "blue",
-                email: "blue@example.com",
+                email: "blue@tcg.com",
                 password: hashedPassword,
             },
         ],
     });
 
-    const redUser = await prisma.user.findUnique({where: {email: "red@example.com"}});
-    const blueUser = await prisma.user.findUnique({where: {email: "blue@example.com"}});
+    const redUser = await prisma.user.findUnique({where: {email: "red@tcg.com"}});
+    const blueUser = await prisma.user.findUnique({where: {email: "blue@tcg.com"}});
 
     if (!redUser || !blueUser) {
         throw new Error("Failed to create users");
