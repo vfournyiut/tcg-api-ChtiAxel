@@ -13,6 +13,7 @@ export const authRouter = Router()
 authRouter.post('/sign-up', async (req: Request, res: Response) => {
     const {email, username, password} = req.body
 
+    
     try {
         // 1. Valider les données
         if (!email || !username || !password) {
