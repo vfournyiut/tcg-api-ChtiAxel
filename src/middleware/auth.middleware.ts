@@ -1,6 +1,15 @@
 import { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 
+/**
+ * Verifie un token JWT et injecte l'utilisateur dans la requete.
+ *
+ * @param {Request} req Requete Express avec l'en-tete `Authorization: Bearer <token>`.
+ * @param {Response} res Reponse Express utilisee pour retourner les erreurs d'authentification.
+ * @param {NextFunction} next Fonction de passage au middleware suivant.
+ * @returns {void} Passe au middleware suivant ou renvoie une erreur 401.
+ * @throws {Error} Si la verification du token echoue ou si le token est manquant.
+ */
 export const authenticateToken = (
     req: Request,
     res: Response,

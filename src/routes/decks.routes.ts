@@ -1,11 +1,19 @@
-import {Request, Response, Router} from 'express'
-import {prisma} from '../database'
-import {authenticateToken} from '../middleware/auth.middleware'
+import { Request, Response, Router } from 'express'
+import { prisma } from '../database'
+import { authenticateToken } from '../middleware/auth.middleware'
 
 export const decksRouter = Router()
 
 decksRouter.use(authenticateToken)
 
+/**
+ * Cree un deck pour l'utilisateur authentifie.
+ *
+ * @param {Request} req Requete Express contenant `name` et `cards` dans le corps.
+ * @param {Response} res Reponse Express contenant le deck cree.
+ * @returns {Promise<Response>} Reponse HTTP 201 avec le deck, ou code d'erreur.
+ * @throws {Error} Si une erreur interne survient lors des acces base de donnees.
+ */
 decksRouter.post('/', async (req: Request, res: Response) => {
     try {
         const name = req.body.name
@@ -13,29 +21,29 @@ decksRouter.post('/', async (req: Request, res: Response) => {
         const userId = req.user?.userId
 
         if (!userId) {
-            return res.status(401).json({error: 'Token manquant'})
+            return res.status(401).json({ error: 'Token manquant' })
         }
 
         if (!name) {
-            return res.status(400).json({error: 'Nom manquant'})
+            return res.status(400).json({ error: 'Nom manquant' })
         }
 
         if (!Array.isArray(cards) || cards.some((id) => !Number.isInteger(id)) || cards.length !== 10) {
-            return res.status(400).json({error: 'Le deck doit contenir exactement 10 cartes'})
+            return res.status(400).json({ error: 'Le deck doit contenir exactement 10 cartes' })
         }
 
         const uniqueCards = new Set(cards)
         if (uniqueCards.size !== 10) {
-            return res.status(400).json({error: 'Les cartes doivent être uniques'})
+            return res.status(400).json({ error: 'Les cartes doivent être uniques' })
         }
 
         const existingCards = await prisma.card.findMany({
-            where: {id: {in: cards}},
-            select: {id: true}
+            where: { id: { in: cards } },
+            select: { id: true }
         })
 
         if (existingCards.length !== 10) {
-            return res.status(400).json({error: 'Certaines cartes sont invalides'})
+            return res.status(400).json({ error: 'Certaines cartes sont invalides' })
         }
 
         const createdDeck = await prisma.deck.create({
@@ -43,12 +51,12 @@ decksRouter.post('/', async (req: Request, res: Response) => {
                 name,
                 userId,
                 cards: {
-                    create: cards.map((cardId) => ({cardId}))
+                    create: cards.map((cardId) => ({ cardId }))
                 }
             },
             include: {
                 cards: {
-                    include: {card: true}
+                    include: { card: true }
                 }
             }
         })
@@ -56,46 +64,62 @@ decksRouter.post('/', async (req: Request, res: Response) => {
         return res.status(201).json(createdDeck)
     } catch (error) {
         console.error('Erreur lors de la création du deck:', error)
-        return res.status(500).json({error: 'Erreur serveur'})
+        return res.status(500).json({ error: 'Erreur serveur' })
     }
 })
 
+/**
+ * Retourne les decks de l'utilisateur authentifie.
+ *
+ * @param {Request} req Requete Express avec l'utilisateur authentifie.
+ * @param {Response} res Reponse Express contenant la liste des decks.
+ * @returns {Promise<Response>} Reponse HTTP 200 avec les decks, ou code d'erreur.
+ * @throws {Error} Si une erreur interne survient lors des acces base de donnees.
+ */
 decksRouter.get('/mine', async (req: Request, res: Response) => {
     try {
         const userId = req.user?.userId
 
         if (!userId) {
-            return res.status(401).json({error: 'Token manquant'})
+            return res.status(401).json({ error: 'Token manquant' })
         }
 
         const decks = await prisma.deck.findMany({
-            where: {userId},
+            where: { userId },
             include: {
                 cards: {
-                    include: {card: true}
+                    include: { card: true }
                 }
             },
-            orderBy: {createdAt: 'desc'}
+            orderBy: { createdAt: 'desc' }
         })
 
         return res.status(200).json(decks)
     } catch (error) {
         console.error('Erreur lors de la récupération des decks:', error)
-        return res.status(500).json({error: 'Erreur serveur'})
+        return res.status(500).json({ error: 'Erreur serveur' })
     }
 })
 
+/**
+ * Retourne un deck par son identifiant pour l'utilisateur authentifie.
+ *
+ * @param {Request} req Requete Express contenant `id` dans les parametres d'URL.
+ * @param {Response} res Reponse Express contenant le deck.
+ * @returns {Promise<Response>} Reponse HTTP 200 avec le deck, ou code d'erreur.
+ * @throws {Error} Si une erreur interne survient lors des acces base de donnees.
+ */
 decksRouter.get('/:id', async (req: Request, res: Response) => {
     try {
         const userId = req.user?.userId
         const deckId = Number(req.params.id)
 
         if (!userId) {
-            return res.status(401).json({error: 'Token manquant'})
+            return res.status(401).json({ error: 'Token manquant' })
         }
 
         if (!Number.isInteger(deckId)) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         const deck = await prisma.deck.findFirst({
@@ -105,22 +129,30 @@ decksRouter.get('/:id', async (req: Request, res: Response) => {
             },
             include: {
                 cards: {
-                    include: {card: true}
+                    include: { card: true }
                 }
             }
         })
 
         if (!deck) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         return res.status(200).json(deck)
     } catch (error) {
         console.error('Erreur lors de la récupération du deck:', error)
-        return res.status(500).json({error: 'Erreur serveur'})
+        return res.status(500).json({ error: 'Erreur serveur' })
     }
 })
 
+/**
+ * Met a jour le nom et/ou les cartes d'un deck.
+ *
+ * @param {Request} req Requete Express contenant `id` en parametre et `name`/`cards` dans le corps.
+ * @param {Response} res Reponse Express contenant le deck mis a jour.
+ * @returns {Promise<Response>} Reponse HTTP 200 avec le deck mis a jour, ou code d'erreur.
+ * @throws {Error} Si une erreur interne survient lors des acces base de donnees.
+ */
 decksRouter.patch('/:id', async (req: Request, res: Response) => {
     try {
         const userId = req.user?.userId
@@ -129,11 +161,11 @@ decksRouter.patch('/:id', async (req: Request, res: Response) => {
         const cards = req.body.cards
 
         if (!userId) {
-            return res.status(401).json({error: 'Token manquant'})
+            return res.status(401).json({ error: 'Token manquant' })
         }
 
         if (!Number.isInteger(deckId)) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         const existingDeck = await prisma.deck.findFirst({
@@ -141,53 +173,53 @@ decksRouter.patch('/:id', async (req: Request, res: Response) => {
                 id: deckId,
                 userId
             },
-            select: {id: true}
+            select: { id: true }
         })
 
         if (!existingDeck) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         if (!name && cards === undefined) {
-            return res.status(400).json({error: 'Aucune donnée à modifier'})
+            return res.status(400).json({ error: 'Aucune donnée à modifier' })
         }
 
         let cardsUpdate = undefined
 
         if (cards !== undefined) {
             if (!Array.isArray(cards) || cards.some((id) => !Number.isInteger(id)) || cards.length !== 10) {
-                return res.status(400).json({error: 'Le deck doit contenir exactement 10 cartes'})
+                return res.status(400).json({ error: 'Le deck doit contenir exactement 10 cartes' })
             }
 
             const uniqueCards = new Set(cards)
             if (uniqueCards.size !== 10) {
-                return res.status(400).json({error: 'Les cartes doivent être uniques'})
+                return res.status(400).json({ error: 'Les cartes doivent être uniques' })
             }
 
             const existingCards = await prisma.card.findMany({
-                where: {id: {in: cards}},
-                select: {id: true}
+                where: { id: { in: cards } },
+                select: { id: true }
             })
 
             if (existingCards.length !== 10) {
-                return res.status(400).json({error: 'Certaines cartes sont invalides'})
+                return res.status(400).json({ error: 'Certaines cartes sont invalides' })
             }
 
             cardsUpdate = {
                 deleteMany: {},
-                create: cards.map((cardId: number) => ({cardId}))
+                create: cards.map((cardId: number) => ({ cardId }))
             }
         }
 
         const updatedDeck = await prisma.deck.update({
-            where: {id: deckId},
+            where: { id: deckId },
             data: {
-                ...(name ? {name} : {}),
-                ...(cardsUpdate ? {cards: cardsUpdate} : {})
+                ...(name ? { name } : {}),
+                ...(cardsUpdate ? { cards: cardsUpdate } : {})
             },
             include: {
                 cards: {
-                    include: {card: true}
+                    include: { card: true }
                 }
             }
         })
@@ -195,21 +227,29 @@ decksRouter.patch('/:id', async (req: Request, res: Response) => {
         return res.status(200).json(updatedDeck)
     } catch (error) {
         console.error('Erreur lors de la modification du deck:', error)
-        return res.status(500).json({error: 'Erreur serveur'})
+        return res.status(500).json({ error: 'Erreur serveur' })
     }
 })
 
+/**
+ * Supprime un deck par son identifiant pour l'utilisateur authentifie.
+ *
+ * @param {Request} req Requete Express contenant `id` dans les parametres d'URL.
+ * @param {Response} res Reponse Express contenant le message de suppression.
+ * @returns {Promise<Response>} Reponse HTTP 200 avec confirmation, ou code d'erreur.
+ * @throws {Error} Si une erreur interne survient lors des acces base de donnees.
+ */
 decksRouter.delete('/:id', async (req: Request, res: Response) => {
     try {
         const userId = req.user?.userId
         const deckId = Number(req.params.id)
 
         if (!userId) {
-            return res.status(401).json({error: 'Token manquant'})
+            return res.status(401).json({ error: 'Token manquant' })
         }
 
         if (!Number.isInteger(deckId)) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         const existingDeck = await prisma.deck.findFirst({
@@ -217,20 +257,20 @@ decksRouter.delete('/:id', async (req: Request, res: Response) => {
                 id: deckId,
                 userId
             },
-            select: {id: true}
+            select: { id: true }
         })
 
         if (!existingDeck) {
-            return res.status(404).json({error: 'Deck introuvable'})
+            return res.status(404).json({ error: 'Deck introuvable' })
         }
 
         await prisma.deck.delete({
-            where: {id: deckId}
+            where: { id: deckId }
         })
 
-        return res.status(200).json({message: 'Deck supprimé'})
+        return res.status(200).json({ message: 'Deck supprimé' })
     } catch (error) {
         console.error('Erreur lors de la suppression du deck:', error)
-        return res.status(500).json({error: 'Erreur serveur'})
+        return res.status(500).json({ error: 'Erreur serveur' })
     }
 })
