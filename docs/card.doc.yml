@@ -1,0 +1,47 @@
+tags:
+  - name: Cards
+    description: Consultation des cartes.
+  - name: System
+    description: Endpoints techniques.
+paths:
+  /api/health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Verifie que l'API repond.
+      responses:
+        '200':
+          description: API disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  message:
+                    type: string
+                    example: TCG Backend Server is running
+  /api/cards:
+    get:
+      tags:
+        - Cards
+      summary: Lister les cartes
+      description: Retourne la liste des cartes triees par numero de Pokedex.
+      responses:
+        '200':
+          description: Liste des cartes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Card'
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

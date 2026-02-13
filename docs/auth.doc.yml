@@ -1,0 +1,111 @@
+tags:
+  - name: Auth
+    description: Inscription et connexion.
+paths:
+  /api/auth/sign-up:
+    post:
+      tags:
+        - Auth
+      summary: Creer un compte utilisateur
+      description: Cree un compte et retourne un JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+            example:
+              email: ash@pallet.town
+              username: ash
+              password: P@ssw0rd123
+      responses:
+        '201':
+          description: Compte cree avec succes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                  - token
+                  - user
+        '400':
+          description: Donnees manquantes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Donnees manquantes
+        '409':
+          description: Email deja utilise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Email deja utilise
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/sign-in:
+    post:
+      tags:
+        - Auth
+      summary: Se connecter
+      description: Connecte un utilisateur et retourne un JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+            example:
+              email: ash@pallet.town
+              password: P@ssw0rd123
+      responses:
+        '200':
+          description: Connexion reussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                  - token
+                  - user
+        '400':
+          description: Donnees manquantes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Donnees manquantes
+        '401':
+          description: Email ou mot de passe incorrect
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Email ou mot de passe incorrect
+        '500':
+          description: Erreur serveur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
