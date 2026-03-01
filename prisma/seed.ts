@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
-import {readFileSync} from "fs";
-import {join} from "path";
-import {prisma} from "../src/database";
-import {CardModel} from "../src/generated/prisma/models/Card";
-import {PokemonType} from "../src/generated/prisma/enums";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { prisma } from "../src/database";
+import { CardModel } from "../src/generated/prisma/models/Card";
+import { PokemonType } from "../src/generated/prisma/enums";
 
 async function main() {
     console.log("🌱 Starting database seed...");
@@ -19,19 +19,19 @@ async function main() {
         data: [
             {
                 username: "red",
-                email: "red@tcg.com",
+                email: "red@example.com",
                 password: hashedPassword,
             },
             {
                 username: "blue",
-                email: "blue@tcg.com",
+                email: "blue@example.com",
                 password: hashedPassword,
             },
         ],
     });
 
-    const redUser = await prisma.user.findUnique({where: {email: "red@tcg.com"}});
-    const blueUser = await prisma.user.findUnique({where: {email: "blue@tcg.com"}});
+    const redUser = await prisma.user.findUnique({ where: { email: "red@example.com" } });
+    const blueUser = await prisma.user.findUnique({ where: { email: "blue@example.com" } });
 
     if (!redUser || !blueUser) {
         throw new Error("Failed to create users");
@@ -62,8 +62,8 @@ async function main() {
     // console.log(createdCards)0*;
 
     const users = [redUser, blueUser];
-    for(const user of users) {
-          const randomCards = [...createdCards].sort(() => 0.5 - Math.random()).slice(0, 10);
+    for (const user of users) {
+        const randomCards = [...createdCards].sort(() => 0.5 - Math.random()).slice(0, 10);
         await prisma.deck.create({
             data: {
                 name: `${user.username}'s Deck`,

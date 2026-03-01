@@ -3,6 +3,8 @@ import { createServer } from "http";
 import { env } from "./env";
 import express from "express";
 import cors from "cors";
+import jwt from "jsonwebtoken";
+import { Server } from "socket.io";
 import { authRouter } from "./routes/auth.routes";
 import { cardsRouter } from './routes/cards.routes';
 import { decksRouter } from './routes/decks.routes';
@@ -76,10 +78,48 @@ const swaggerDocument = (() => {
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+type JwtPayload = {
+    userId: number;
+    email: string;
+}
+
 // Start server only if this file is run directly (not imported for tests)
 if (require.main === module) {
     // Create HTTP server
     const httpServer = createServer(app);
+    const io = new Server(httpServer, {
+        cors: {
+            origin: true,
+            credentials: true,
+        },
+    });
+
+    io.use((socket, next) => {
+        const token = socket.handshake.auth.token as string | undefined;
+
+        if (!token) {
+            next(new Error('Token manquant'));
+            return;
+        }
+
+        try {
+            const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+
+            socket.data.userId = decoded.userId;
+            socket.data.email = decoded.email;
+
+            next();
+        } catch {
+            next(new Error('Token invalide ou expiré'));
+        }
+    });
+
+    io.on('connection', (socket) => {
+        socket.emit('authenticated', {
+            userId: socket.data.userId,
+            email: socket.data.email,
+        });
+    });
 
 
     // Start server
