@@ -14,6 +14,8 @@ import yaml from "js-yaml";
 import swaggerUi from "swagger-ui-express";
 import { v4 as uuidv4 } from "uuid";
 import { prisma } from "./database";
+import { calculateDamage } from "./utils/rules.util";
+import { PokemonType } from "./generated/prisma/enums";
 
 // Create Express app
 export const app = express();
@@ -117,8 +119,8 @@ type GameState = {
             username: string;
             deck: GameCard[];
             hand: GameCard[];
-            activeCard: GameCard | null;
-            hp: number;
+            activeCard: (GameCard & { currentHp: number }) | null;
+            score: number;
         }
     }
 }
@@ -347,7 +349,7 @@ if (require.main === module) {
                             deck: hostCards.slice(5),
                             hand: hostCards.slice(0, 5),
                             activeCard: null,
-                            hp: 20,
+                            score: 0,
                         },
                         [userId]: {
                             userId: userId,
@@ -355,7 +357,7 @@ if (require.main === module) {
                             deck: guestCards.slice(5),
                             hand: guestCards.slice(0, 5),
                             activeCard: null,
-                            hp: 20,
+                            score: 0,
                         },
                     },
                 };
@@ -390,6 +392,220 @@ if (require.main === module) {
             } catch (error) {
                 console.error('Error joining room:', error);
                 socket.emit('error', { message: 'Erreur lors de la jonction à la room' });
+            }
+        });
+
+        // Helper function to send differentiated game state
+        const sendGameState = (roomId: string) => {
+            const game = games.get(roomId);
+            const room = rooms.get(roomId);
+
+            if (!game || !room) return;
+
+            const playerIds = Object.keys(game.players).map(Number);
+
+            for (const playerId of playerIds) {
+                const socketId = playerId === room.hostUserId ? room.hostSocketId : room.guestSocketId;
+                const opponentId = playerIds.find(id => id !== playerId)!;
+
+                if (socketId) {
+                    io.to(socketId).emit('gameStateUpdated', {
+                        roomId,
+                        currentTurn: game.currentTurn,
+                        you: game.players[playerId],
+                        opponent: {
+                            ...game.players[opponentId],
+                            hand: game.players[opponentId].hand.map(() => null),
+                            deck: game.players[opponentId].deck.map(() => null),
+                        },
+                    });
+                }
+            }
+        };
+
+        // DRAW_CARDS handler
+        socket.on('drawCards', async (data: { roomId: string }) => {
+            try {
+                const { roomId } = data;
+                const userId = socket.data.userId;
+                const game = games.get(roomId);
+
+                if (!game) {
+                    socket.emit('error', { message: 'Partie introuvable' });
+                    return;
+                }
+
+                if (game.currentTurn !== userId) {
+                    socket.emit('error', { message: 'Ce n\'est pas votre tour' });
+                    return;
+                }
+
+                const player = game.players[userId];
+
+                // Draw cards until hand has 5 cards
+                while (player.hand.length < 5 && player.deck.length > 0) {
+                    const card = player.deck.shift()!;
+                    player.hand.push(card);
+                }
+
+                sendGameState(roomId);
+            } catch (error) {
+                console.error('Error drawing cards:', error);
+                socket.emit('error', { message: 'Erreur lors de la pioche' });
+            }
+        });
+
+        // PLAY_CARD handler
+        socket.on('playCard', async (data: { roomId: string; cardIndex: number }) => {
+            try {
+                const { roomId, cardIndex } = data;
+                const userId = socket.data.userId;
+                const game = games.get(roomId);
+
+                if (!game) {
+                    socket.emit('error', { message: 'Partie introuvable' });
+                    return;
+                }
+
+                if (game.currentTurn !== userId) {
+                    socket.emit('error', { message: 'Ce n\'est pas votre tour' });
+                    return;
+                }
+
+                const player = game.players[userId];
+
+                if (cardIndex < 0 || cardIndex >= player.hand.length) {
+                    socket.emit('error', { message: 'Index de carte invalide' });
+                    return;
+                }
+
+                // Remove card from hand and set as active
+                const card = player.hand.splice(cardIndex, 1)[0];
+                player.activeCard = {
+                    ...card,
+                    currentHp: card.hp,
+                };
+
+                sendGameState(roomId);
+            } catch (error) {
+                console.error('Error playing card:', error);
+                socket.emit('error', { message: 'Erreur lors de la pose de carte' });
+            }
+        });
+
+        // ATTACK handler
+        socket.on('attack', async (data: { roomId: string }) => {
+            try {
+                const { roomId } = data;
+                const userId = socket.data.userId;
+                const game = games.get(roomId);
+                const room = rooms.get(roomId);
+
+                if (!game || !room) {
+                    socket.emit('error', { message: 'Partie introuvable' });
+                    return;
+                }
+
+                if (game.currentTurn !== userId) {
+                    socket.emit('error', { message: 'Ce n\'est pas votre tour' });
+                    return;
+                }
+
+                const player = game.players[userId];
+                const opponentId = Object.keys(game.players).map(Number).find(id => id !== userId)!;
+                const opponent = game.players[opponentId];
+
+                if (!player.activeCard) {
+                    socket.emit('error', { message: 'Vous n\'avez pas de carte active' });
+                    return;
+                }
+
+                if (!opponent.activeCard) {
+                    socket.emit('error', { message: 'L\'adversaire n\'a pas de carte active' });
+                    return;
+                }
+
+                // Calculate damage
+                const damage = calculateDamage(
+                    player.activeCard.attack,
+                    player.activeCard.type as PokemonType,
+                    opponent.activeCard.type as PokemonType
+                );
+
+                opponent.activeCard.currentHp -= damage;
+
+                // Check if opponent's card is KO
+                if (opponent.activeCard.currentHp <= 0) {
+                    player.score += 1;
+                    opponent.activeCard = null;
+                }
+
+                // Check for victory
+                if (player.score >= 3) {
+                    const winnerSocketId = userId === room.hostUserId ? room.hostSocketId : room.guestSocketId;
+                    const loserSocketId = userId === room.hostUserId ? room.guestSocketId : room.hostSocketId;
+
+                    io.to(winnerSocketId!).emit('gameEnded', {
+                        winner: userId,
+                        winnerUsername: player.username,
+                        reason: 'score',
+                        finalScore: {
+                            [userId]: player.score,
+                            [opponentId]: opponent.score,
+                        },
+                    });
+
+                    io.to(loserSocketId!).emit('gameEnded', {
+                        winner: userId,
+                        winnerUsername: player.username,
+                        reason: 'score',
+                        finalScore: {
+                            [userId]: player.score,
+                            [opponentId]: opponent.score,
+                        },
+                    });
+
+                    // Clean up
+                    games.delete(roomId);
+                    rooms.delete(roomId);
+                    return;
+                }
+
+                // Switch turn
+                game.currentTurn = opponentId;
+
+                sendGameState(roomId);
+            } catch (error) {
+                console.error('Error attacking:', error);
+                socket.emit('error', { message: 'Erreur lors de l\'attaque' });
+            }
+        });
+
+        // END_TURN handler
+        socket.on('endTurn', async (data: { roomId: string }) => {
+            try {
+                const { roomId } = data;
+                const userId = socket.data.userId;
+                const game = games.get(roomId);
+
+                if (!game) {
+                    socket.emit('error', { message: 'Partie introuvable' });
+                    return;
+                }
+
+                if (game.currentTurn !== userId) {
+                    socket.emit('error', { message: 'Ce n\'est pas votre tour' });
+                    return;
+                }
+
+                // Switch turn to opponent
+                const opponentId = Object.keys(game.players).map(Number).find(id => id !== userId)!;
+                game.currentTurn = opponentId;
+
+                sendGameState(roomId);
+            } catch (error) {
+                console.error('Error ending turn:', error);
+                socket.emit('error', { message: 'Erreur lors de la fin de tour' });
             }
         });
 
