@@ -1,0 +1,208 @@
+openapi: 3.0.3
+info:
+  title: TCG API
+  version: 1.0.0
+  description: API pour l'authentification, la gestion des cartes et des decks.
+servers:
+  - url: http://localhost:3001
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+      example:
+        error: Erreur serveur
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: ash
+        email:
+          type: string
+          example: ash@pallet.town
+        createdAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+      required:
+        - id
+        - username
+        - email
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 25
+        name:
+          type: string
+          example: Pikachu
+        hp:
+          type: integer
+          example: 60
+        attack:
+          type: integer
+          example: 55
+        type:
+          type: string
+          enum:
+            - Normal
+            - Fire
+            - Water
+            - Electric
+            - Grass
+            - Ice
+            - Fighting
+            - Poison
+            - Ground
+            - Flying
+            - Psychic
+            - Bug
+            - Rock
+            - Ghost
+            - Dragon
+            - Dark
+            - Steel
+            - Fairy
+          example: Electric
+        pokedexNumber:
+          type: integer
+          example: 25
+        imgUrl:
+          type: string
+          nullable: true
+          example: https://assets.pokemon.com/assets/cms2/img/pokedex/full/025.png
+        createdAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+      required:
+        - id
+        - name
+        - hp
+        - attack
+        - type
+        - pokedexNumber
+    DeckCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        deckId:
+          type: integer
+          example: 12
+        cardId:
+          type: integer
+          example: 25
+        card:
+          $ref: '#/components/schemas/Card'
+      required:
+        - id
+        - deckId
+        - cardId
+    Deck:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        name:
+          type: string
+          example: Starter Deck
+        userId:
+          type: integer
+          example: 1
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeckCard'
+        createdAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2026-02-13T10:15:00.000Z
+      required:
+        - id
+        - name
+        - userId
+        - cards
+    SignUpRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          example: ash@pallet.town
+        username:
+          type: string
+          example: ash
+        password:
+          type: string
+          example: P@ssw0rd123
+      required:
+        - email
+        - username
+        - password
+    SignInRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          example: ash@pallet.town
+        password:
+          type: string
+          example: P@ssw0rd123
+      required:
+        - email
+        - password
+    DeckCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Starter Deck
+        cards:
+          type: array
+          items:
+            type: integer
+            example: 25
+          example: [1, 4, 7, 10, 13, 16, 19, 25, 52, 133]
+      required:
+        - name
+        - cards
+    DeckUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Updated Deck Name
+        cards:
+          type: array
+          items:
+            type: integer
+            example: 25
+          example: [2, 5, 8, 11, 14, 17, 20, 26, 53, 134]
